@@ -5,7 +5,7 @@ pub fn input_generator(input: &str) -> Vec<(i32, i32)> {
     input
         .lines()
         .map(|l| {
-            let mut segments = l.split(" ");
+            let mut segments = l.split(' ');
             match segments.next() {
                 Some("forward") => (segments.next().unwrap().parse().unwrap(), 0),
                 Some("up") => (0, -segments.next().unwrap().parse::<i32>().unwrap()),
