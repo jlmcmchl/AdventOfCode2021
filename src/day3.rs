@@ -19,26 +19,98 @@ pub fn input_generator(input: &str) -> DMatrix<usize> {
 
 #[aoc(day3, part1)]
 pub fn solve_p1(input: &DMatrix<usize>) -> u64 {
-    let (gamma, epsilon) = input.transpose().row_iter().enumerate().fold(
-        (0u32, 0u32),
-        |(gamma, epsilon), (id, row)| {
-            let ones: usize = row.iter().sum();
-            let zeros = row.len() - ones;
+    let (gamma, epsilon) =
+        input
+            .transpose()
+            .row_iter()
+            .fold((0u32, 0u32), |(gamma, epsilon), row| {
+                let ones: usize = row.iter().sum();
+                let zeros = row.len() - ones;
 
-            if ones > zeros {
-                (gamma << 1 | 1, epsilon << 1)
-            } else {
-                (gamma << 1, epsilon << 1 | 1)
-            }
-        },
-    );
+                if ones > zeros {
+                    (gamma << 1 | 1, epsilon << 1)
+                } else {
+                    (gamma << 1, epsilon << 1 | 1)
+                }
+            });
 
     gamma as u64 * epsilon as u64
 }
 
-// #[aoc(day3, part2)]
-pub fn solve_p2(input: &DMatrix<usize>) -> u128 {
-    0
+fn row_to_number(row: DMatrix<usize>) -> usize {
+    row.iter().fold(0, |agg, i| agg << 1 | i)
+}
+
+fn oxygen_rating(input: &DMatrix<usize>) -> usize {
+    let (_, cols) = input.shape();
+
+    let mut input = input.clone();
+
+    for i in 0..cols {
+        let (zeros, ones) = input.row_iter().fold((0u32, 0u32), |(zeros, ones), row| {
+            if row[(0, i)] == 0 {
+                (zeros + 1, ones)
+            } else {
+                (zeros, ones + 1)
+            }
+        });
+
+        let take_zeros = zeros > ones;
+
+        input = DMatrix::from_rows(
+            &input
+                .row_iter()
+                .filter(|row| (row[(0, i)] == 0 && take_zeros) || (row[(0, i)] == 1 && !take_zeros))
+                .collect::<Vec<_>>(),
+        );
+
+        if input.shape().0 == 1 {
+            break;
+        }
+    }
+
+    // turn input into number again
+    row_to_number(input)
+}
+
+fn co2_rating(input: &DMatrix<usize>) -> usize {
+    let (_, cols) = input.shape();
+
+    let mut input = input.clone();
+
+    for i in 0..cols {
+        let (zeros, ones) = input.row_iter().fold((0u32, 0u32), |(zeros, ones), row| {
+            if row[(0, i)] == 0 {
+                (zeros + 1, ones)
+            } else {
+                (zeros, ones + 1)
+            }
+        });
+
+        let take_ones = ones < zeros;
+
+        input = DMatrix::from_rows(
+            &input
+                .row_iter()
+                .filter(|row| (row[(0, i)] == 1 && take_ones) || (row[(0, i)] == 0 && !take_ones))
+                .collect::<Vec<_>>(),
+        );
+
+        if input.shape().0 == 1 {
+            break;
+        }
+    }
+
+    // turn input into number again
+    row_to_number(input)
+}
+
+#[aoc(day3, part2)]
+pub fn solve_p2(input: &DMatrix<usize>) -> usize {
+    let o2 = oxygen_rating(input);
+    let co2 = co2_rating(input);
+
+    o2 * co2
 }
 
 #[cfg(test)]
