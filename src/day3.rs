@@ -41,7 +41,7 @@ fn row_to_number(row: DMatrix<usize>) -> usize {
     row.iter().fold(0, |agg, i| agg << 1 | i)
 }
 
-fn oxygen_rating(input: &DMatrix<usize>) -> usize {
+fn get_rating(input: &DMatrix<usize>, inverted: bool) -> usize {
     let (_, cols) = input.shape();
 
     let mut input = input.clone();
@@ -55,7 +55,7 @@ fn oxygen_rating(input: &DMatrix<usize>) -> usize {
             }
         });
 
-        let take_zeros = zeros > ones;
+        let take_zeros = (zeros > ones) ^ inverted;
 
         input = DMatrix::from_rows(
             &input
@@ -73,42 +73,10 @@ fn oxygen_rating(input: &DMatrix<usize>) -> usize {
     row_to_number(input)
 }
 
-fn co2_rating(input: &DMatrix<usize>) -> usize {
-    let (_, cols) = input.shape();
-
-    let mut input = input.clone();
-
-    for i in 0..cols {
-        let (zeros, ones) = input.row_iter().fold((0u32, 0u32), |(zeros, ones), row| {
-            if row[(0, i)] == 0 {
-                (zeros + 1, ones)
-            } else {
-                (zeros, ones + 1)
-            }
-        });
-
-        let take_ones = ones < zeros;
-
-        input = DMatrix::from_rows(
-            &input
-                .row_iter()
-                .filter(|row| (row[(0, i)] == 1 && take_ones) || (row[(0, i)] == 0 && !take_ones))
-                .collect::<Vec<_>>(),
-        );
-
-        if input.shape().0 == 1 {
-            break;
-        }
-    }
-
-    // turn input into number again
-    row_to_number(input)
-}
-
 #[aoc(day3, part2)]
 pub fn solve_p2(input: &DMatrix<usize>) -> usize {
-    let o2 = oxygen_rating(input);
-    let co2 = co2_rating(input);
+    let o2 = get_rating(input, false);
+    let co2 = get_rating(input, true);
 
     o2 * co2
 }
