@@ -47,13 +47,9 @@ fn get_rating(input: &DMatrix<usize>, inverted: bool) -> usize {
     let mut input = input.clone();
 
     for i in 0..cols {
-        let (zeros, ones) = input.row_iter().fold((0u32, 0u32), |(zeros, ones), row| {
-            if row[(0, i)] == 0 {
-                (zeros + 1, ones)
-            } else {
-                (zeros, ones + 1)
-            }
-        });
+        let col = input.column(i);
+        let ones: usize = col.iter().sum();
+        let zeros = col.shape().0 - ones;
 
         let take_zeros = (zeros > ones) ^ inverted;
 
