@@ -1,223 +1,83 @@
-use std::{collections::HashMap, str::FromStr};
-
 use aoc_runner_derive::{aoc, aoc_generator};
-use bit_iter::BitIter;
 use std::convert::TryInto;
 
-use lazy_static::lazy_static;
-
-#[derive(Default, Debug)]
-pub struct Seg7 {
-    inputs: u8,
+fn parse_segment(input: &str) -> u8 {
+    input.bytes().fold(0u8, |agg, c| agg | 1 << (c - 97))
 }
 
-impl FromStr for Seg7 {
-    type Err = String;
+fn deduce(display: &[u8; 14]) -> usize {
+    // map[display id] -> displayed number;
+    let mut display_map = [0usize; 14];
+    // map[displayed number] -> input signal
+    let mut inverse_map = [0u8; 10];
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Seg7 {
-            inputs: s.bytes().fold(0u8, |agg, c| agg | 1 << (c - 97)),
-        })
-    }
-}
-
-/*
-displayed number -> segment count
-0: 6
-1: 2
-2: 5
-3: 5
-4: 4
-5: 5
-6: 6
-7: 3
-8: 7
-9: 6
- ->
-segment count -> displayed number
-2: 1
-3: 7
-4: 4
-5: 2, 3, 5
-6: 0, 6, 9
-7: 8
-
-displayed number -> segments
-_  0, 1, 2, 3, 4, 5, 6
-0: 0, 1, 2,    4, 5, 6
-1:       2,       5
-2: 0,    2, 3, 4,    6
-3: 0,    2, 3,    5, 6
-4:    1, 2, 3,    5,
-5: 0, 1,    3,    5, 6
-6: 0, 1,    3, 4, 5, 6
-7: 0,    2,       5
-8: 0, 1, 2, 3, 4, 5, 6
-9: 0, 1, 2, 3,    5, 6
-->
-segment -> candidate number
-_  0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-0: 0,    2, 3,    5, 6, 7, 8, 9
-1: 0,          4, 5, 6,    8, 9
-2: 0, 1, 2, 3, 4,       7, 8, 9
-3:       2, 3, 4, 5, 6,    8, 9
-4: 0,    2,          6,    8
-5: 0, 1,    3, 4, 5, 6, 7, 8, 9
-6: 0,    2, 3,    5, 6,    8, 9
-
-*/
-
-lazy_static! {
-    static ref BITCOUNT_TO_CANDIDATE: HashMap<u32, Vec<u8>> = {
-        let mut map = HashMap::new();
-        map.insert(2, vec![1]);
-        map.insert(3, vec![7]);
-        map.insert(4, vec![4]);
-        map.insert(5, vec![2, 3, 5]);
-        map.insert(6, vec![0, 6, 9]);
-        map.insert(7, vec![8]);
-
-        map
-    };
-
-    static ref SEGMENT_TO_CANDIDATE: Vec<Vec<u8>> = vec![
-        /* 0 */ vec![0, 2, 3, 5, 6, 7, 8, 9],
-        /* 1 */ vec![0, 4, 5, 6, 8, 9],
-        /* 2 */ vec![0, 1, 2, 3, 4, 7, 8, 9],
-        /* 3 */ vec![2, 3, 4, 5, 6, 8, 9],
-        /* 4 */ vec![0, 2, 6, 8],
-        /* 5 */ vec![0, 1, 3, 4, 5, 6, 7, 8, 9],
-        /* 6 */ vec![0, 2, 3, 5, 6, 8, 9],
-    ];
-
-    static ref CANDIDATE_TO_OBSERVED: Vec<u8> = vec![
-        /* 0 */ 0b1110111,
-        /* 1 */ 0b0100100,
-        /* 2 */ 0b1011101,
-        /* 3 */ 0b1101101,
-        /* 4 */ 0b0101110,
-        /* 5 */ 0b1101011,
-        /* 6 */ 0b1111011,
-        /* 7 */ 0b0100101,
-        /* 8 */ 0b1111111,
-        /* 9 */ 0b1101111,
-    ];
-
-    static ref OBSERVED_TO_CANDIDATE: HashMap<u8, u8> = {
-        let mut map = HashMap::new();
-
-        map.insert(0b1110111, 0);
-        map.insert(0b0100100, 1);
-        map.insert(0b1011101, 2);
-        map.insert(0b1101101, 3);
-        map.insert(0b0101110, 4);
-        map.insert(0b1101011, 5);
-        map.insert(0b1111011, 6);
-        map.insert(0b0100101, 7);
-        map.insert(0b1111111, 8);
-        map.insert(0b1101111, 9);
-
-        map
-    };
-
-}
-
-/*
-id | possible mapping    | count
-0: | 0, 1, 0, 0, 1, 0, 0 | 2
-1: | 0, 1, 0, 0, 1, 0, 0 | 2 
-2: | 1, 1, 1, 1, 1, 1, 1 | 7 
-3: | 0, 1, 0, 0, 1, 0, 1 | 3
-4: | 0, 1, 0, 1, 1, 1, 0 | 4
-5: | 0, 1, 0, 1, 1, 1, 0 | 4
-6: | 1, 1, 1, 1, 1, 1, 1 | 7
-
-sorted by count
--> 
-reduce candidates
-
-id | possible mapping    | count
-0: | 0, 1, 0, 0, 1, 0, 0 | 2
-1: | 0, 1, 0, 0, 1, 0, 0 | 2 
-3: | 0, 0, 0, 0, 0, 0, 1 | 1
-4: | 0, 0, 0, 1, 0, 1, 0 | 2
-5: | 0, 0, 0, 1, 0, 1, 0 | 2
-2: | 1, 0, 1, 1, 0, 1, 1 | 5 
-6: | 1, 0, 1, 1, 0, 1, 1 | 5
-
-sorted by count
--> 
-reduce candidates
-
-id | possible mapping    | count | letter
-3: | 0, 0, 0, 0, 0, 0, 1 | 1     | d
-0: | 0, 1, 0, 0, 1, 0, 0 | 2     | a
-1: | 0, 1, 0, 0, 1, 0, 0 | 2     | b
-4: | 0, 0, 0, 1, 0, 1, 0 | 2     | e
-5: | 0, 0, 0, 1, 0, 1, 0 | 2     | f
-2: | 1, 0, 1, 0, 0, 0, 0 | 2     | c
-6: | 1, 0, 1, 0, 0, 0, 0 | 2     | g
-
-  0:      1:      2:      3:      4:
- aaaa    ....    aaaa    aaaa    ....
-b    c  .    c  .    c  .    c  b    c
-b    c  .    c  .    c  .    c  b    c
- ....    ....    dddd    dddd    dddd
-e    f  .    f  e    .  .    f  .    f
-e    f  .    f  e    .  .    f  .    f
- gggg    ....    gggg    gggg    ....
-
-  5:      6:      7:      8:      9:
- aaaa    aaaa    aaaa    aaaa    aaaa
-b    .  b    .  .    c  b    c  b    c
-b    .  b    .  .    c  b    c  b    c
- dddd    dddd    ....    dddd    dddd
-.    f  e    f  .    f  e    f  .    f
-.    f  e    f  .    f  e    f  .    f
- gggg    gggg    ....    gggg    gggg
-
-acedgfb cdfbe gcdfa fbcad dab cefabd cdfgeb eafb cagedb ab | cdfeb fcadb cdfeb cdbaf
-  8       5               7                 4      0/6   1
-
- --d--
-e    a
-f    b
- eeff
-c    a
-g    b
- ccgg
-*/
-
-fn deduce(display: &[Seg7; 14]) -> usize {
-    // map[input segment] -> output segment
-    let mut signal_map = [127u8; 7];
-
-    display.iter().for_each(|mystery| {
-        let candidates = &BITCOUNT_TO_CANDIDATE[&mystery.inputs.count_ones()];
-
-        let candidate_mask = candidates.iter().fold(0u8, |agg, number| {
-            agg | CANDIDATE_TO_OBSERVED[*number as usize]
+    // find 1, 4, 7, 8
+    display
+        .iter()
+        .enumerate()
+        .for_each(|(id, mystery)| match mystery.count_ones() {
+            2 => {
+                inverse_map[1] = *mystery;
+                display_map[id] = 1;
+            }
+            3 => {
+                inverse_map[7] = *mystery;
+                display_map[id] = 7;
+            }
+            4 => {
+                inverse_map[4] = *mystery;
+                display_map[id] = 4;
+            }
+            7 => {
+                inverse_map[8] = *mystery;
+                display_map[id] = 8;
+            }
+            _ => {}
         });
-        BitIter::from(mystery.inputs).for_each(|i| signal_map[i] &= candidate_mask);
+
+    // the rest
+    display.iter().enumerate().for_each(|(id, mystery)| {
+        match mystery.count_ones() {
+            // 2, 3, 5
+            5 => {
+                if mystery & inverse_map[7] == inverse_map[7] {
+                    inverse_map[3] = *mystery;
+                    display_map[id] = 3;
+                } else if (mystery & inverse_map[4]).count_ones() == 2 {
+                    inverse_map[2] = *mystery;
+                    display_map[id] = 2;
+                } else {
+                    inverse_map[5] = *mystery;
+                    display_map[id] = 5;
+                }
+            }
+            // 0, 6, 9
+            6 => {
+                if mystery & inverse_map[4] == inverse_map[4] {
+                    inverse_map[9] = *mystery;
+                    display_map[id] = 9;
+                } else if mystery & inverse_map[7] == inverse_map[7] {
+                    inverse_map[0] = *mystery;
+                    display_map[id] = 0;
+                } else {
+                    inverse_map[6] = *mystery;
+                    display_map[id] = 6;
+                }
+            }
+            _ => {}
+        }
     });
 
-    signal_map.iter().for_each(|i| print!("{:#b} ", i));
-
-    let mut signal_map_enumerated = signal_map.into_iter().enumerate().collect::<Vec<_>>();
-    signal_map_enumerated.sort_by_cached_key(|(_, mask)| mask.count_ones());
-
-    println!("");
-
-    Default::default()
+    display_map[10] * 1000 + display_map[11] * 100 + display_map[12] * 10 + display_map[13]
 }
 
-fn parse_input(input: &str) -> Vec<[Seg7; 14]> {
+fn parse_input(input: &str) -> Vec<[u8; 14]> {
     input
         .lines()
         .map(|line| {
             line.replace("| ", "")
                 .split(' ')
-                .map(|segment| segment.parse::<Seg7>().unwrap())
+                .map(|segment| parse_segment(segment))
                 .collect::<Vec<_>>()
                 .try_into()
                 .unwrap()
@@ -225,7 +85,7 @@ fn parse_input(input: &str) -> Vec<[Seg7; 14]> {
         .collect()
 }
 
-fn solve_p1(input: &[[Seg7; 14]]) -> usize {
+fn solve_p1(input: &[[u8; 14]]) -> usize {
     let unique_segment_counts = vec![2, 3, 4, 7];
 
     input
@@ -234,28 +94,28 @@ fn solve_p1(input: &[[Seg7; 14]]) -> usize {
             display
                 .iter()
                 .skip(10)
-                .filter(|number| unique_segment_counts.contains(&number.inputs.count_ones()))
+                .filter(|number| unique_segment_counts.contains(&number.count_ones()))
                 .count()
         })
         .sum()
 }
 
-fn solve_p2(input: &[[Seg7; 14]]) -> usize {
+fn solve_p2(input: &[[u8; 14]]) -> usize {
     input.iter().map(|display| deduce(display)).sum()
 }
 
 #[aoc_generator(day8)]
-pub fn input_generator(input: &str) -> Vec<[Seg7; 14]> {
+pub fn input_generator(input: &str) -> Vec<[u8; 14]> {
     parse_input(input)
 }
 
 #[aoc(day8, part1)]
-pub fn wrapper_p1(input: &[[Seg7; 14]]) -> usize {
+pub fn wrapper_p1(input: &[[u8; 14]]) -> usize {
     solve_p1(input)
 }
 
 #[aoc(day8, part2)]
-pub fn wrapper_p2(input: &[[Seg7; 14]]) -> usize {
+pub fn wrapper_p2(input: &[[u8; 14]]) -> usize {
     solve_p2(input)
 }
 
