@@ -56,7 +56,7 @@ fn basin_size(map: &DMatrix<u8>, source: (usize, usize)) -> usize {
     let mut last_layer = vec![source];
 
     while !last_layer.is_empty() {
-        let mut next_layer = last_layer
+        let mut next_layer: Vec<(usize, usize)> = last_layer
             .iter()
             .flat_map(|coord| {
                 surrounding(*coord)
@@ -65,12 +65,12 @@ fn basin_size(map: &DMatrix<u8>, source: (usize, usize)) -> usize {
             })
             .collect();
 
+        next_layer.sort_unstable();
+        next_layer.dedup();
+
         seen.append(&mut last_layer);
         last_layer.append(&mut next_layer);
     }
-
-    seen.sort_unstable();
-    seen.dedup();
 
     seen.len()
 }
