@@ -77,7 +77,7 @@ fn parse_input(input: &str) -> Vec<[u8; 14]> {
         .map(|line| {
             line.replace("| ", "")
                 .split(' ')
-                .map(|segment| parse_segment(segment))
+                .map(parse_segment)
                 .collect::<Vec<_>>()
                 .try_into()
                 .unwrap()
@@ -101,7 +101,7 @@ fn solve_p1(input: &[[u8; 14]]) -> usize {
 }
 
 fn solve_p2(input: &[[u8; 14]]) -> usize {
-    input.iter().map(|display| deduce(display)).sum()
+    input.iter().map(deduce).sum()
 }
 
 #[aoc_generator(day8)]

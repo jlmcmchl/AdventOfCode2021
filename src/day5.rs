@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{cmp::Ordering, collections::HashMap, str::FromStr};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 
@@ -40,24 +40,22 @@ impl FromIterator<Point> for Line {
         let start = iter.next().unwrap();
         let end = iter.next().unwrap();
 
-        if start.x == end.x {
-            if start.y > end.y {
-                Line {
-                    start: end,
-                    end: start,
+        match start.x.cmp(&end.x) {
+            Ordering::Equal => {
+                if start.y > end.y {
+                    Line {
+                        start: end,
+                        end: start,
+                    }
+                } else {
+                    Line { start, end }
                 }
-            } else {
-                Line { start, end }
             }
-        } else {
-            if start.x > end.x {
-                Line {
-                    start: end,
-                    end: start,
-                }
-            } else {
-                Line { start, end }
-            }
+            Ordering::Greater => Line {
+                start: end,
+                end: start,
+            },
+            Ordering::Less => Line { start, end },
         }
     }
 }
