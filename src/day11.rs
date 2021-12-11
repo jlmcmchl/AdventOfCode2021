@@ -1,5 +1,5 @@
 use aoc_runner_derive::{aoc, aoc_generator};
-use nalgebra::DMatrix;
+use nalgebra::SMatrix;
 
 fn surrounding((i, j): (usize, usize), (rows, cols): (usize, usize)) -> Vec<(usize, usize)> {
     let mut vec = Vec::new();
@@ -34,28 +34,26 @@ fn surrounding((i, j): (usize, usize), (rows, cols): (usize, usize)) -> Vec<(usi
     vec
 }
 
-fn step(input: &DMatrix<u8>) -> (DMatrix<u8>, usize) {
+fn step(input: &SMatrix<u8, 10, 10>) -> (SMatrix<u8, 10, 10>, usize) {
     let (rows, cols) = input.shape();
     let mut flash_mat = input.add_scalar(1);
 
     let mut last_flashes = 1;
     let mut flashes = 0;
-    let mut flashers = Vec::new();
+    let mut flashers = Vec::with_capacity(100);
 
     while flashes != last_flashes || (last_flashes == 0 && flashes != 0) {
         last_flashes = flashes;
         for i in 0..rows {
             for j in 0..cols {
-                if !flashers.contains(&(i, j)) {
-                    let val = flash_mat[(i, j)];
-                    if val > 9 {
-                        // add 1 to surrounding
-                        for coord in surrounding((i, j), (rows, cols)) {
-                            flash_mat[coord] += 1;
-                        }
-                        flashes += 1;
-                        flashers.push((i, j));
+                let val = flash_mat[(i, j)];
+                if val > 9 && !flashers.contains(&(i, j)) {
+                    // add 1 to surrounding
+                    for coord in surrounding((i, j), (rows, cols)) {
+                        flash_mat[coord] = 10.max(flash_mat[coord] + 1);
                     }
+                    flashes += 1;
+                    flashers.push((i, j));
                 }
             }
         }
@@ -74,22 +72,19 @@ fn step(input: &DMatrix<u8>) -> (DMatrix<u8>, usize) {
     (flash_mat, last_flashes)
 }
 
-fn steps(input: &DMatrix<u8>, steps: usize) -> (DMatrix<u8>, usize) {
-    (0..steps).fold((input.clone(), 0), |(mat, flashcnt), iter| {
+fn steps(input: &SMatrix<u8, 10, 10>, steps: usize) -> (SMatrix<u8, 10, 10>, usize) {
+    (0..steps).fold((*input, 0), |(mat, flashcnt), _| {
         let (next_mat, flashes) = step(&mat);
         (next_mat, flashcnt + flashes)
     })
 }
 
-fn flash_count(input: &DMatrix<u8>, stepcnt: usize) -> usize {
+fn flash_count(input: &SMatrix<u8, 10, 10>, stepcnt: usize) -> usize {
     steps(input, stepcnt).1
 }
 
-fn parse_input(input: &str) -> DMatrix<u8> {
-    let rows = input.lines().count();
-    let cols = input.lines().next().unwrap().len();
-
-    let mut mat = DMatrix::<u8>::zeros(rows, cols);
+fn parse_input(input: &str) -> SMatrix<u8, 10, 10> {
+    let mut mat = SMatrix::<u8, 10, 10>::zeros();
 
     input.lines().enumerate().for_each(|(i, row)| {
         row.trim()
@@ -104,12 +99,12 @@ fn parse_input(input: &str) -> DMatrix<u8> {
     mat
 }
 
-fn solve_p1(input: &DMatrix<u8>) -> usize {
+fn solve_p1(input: &SMatrix<u8, 10, 10>) -> usize {
     flash_count(input, 100)
 }
 
-fn solve_p2(input: &DMatrix<u8>) -> usize {
-    let mut current_mat = input.clone();
+fn solve_p2(input: &SMatrix<u8, 10, 10>) -> usize {
+    let mut current_mat = *input;
 
     for iter in 0.. {
         let (next_mat, _) = step(&current_mat);
@@ -118,22 +113,22 @@ fn solve_p2(input: &DMatrix<u8>) -> usize {
         }
         current_mat = next_mat;
     }
-    
+
     0
 }
 
 #[aoc_generator(day11)]
-pub fn input_generator(input: &str) -> DMatrix<u8> {
+pub fn input_generator(input: &str) -> SMatrix<u8, 10, 10> {
     parse_input(input)
 }
 
 #[aoc(day11, part1)]
-pub fn wrapper_p1(input: &DMatrix<u8>) -> usize {
+pub fn wrapper_p1(input: &SMatrix<u8, 10, 10>) -> usize {
     solve_p1(input)
 }
 
 #[aoc(day11, part2)]
-pub fn wrapper_p2(input: &DMatrix<u8>) -> usize {
+pub fn wrapper_p2(input: &SMatrix<u8, 10, 10>) -> usize {
     solve_p2(input)
 }
 
@@ -141,23 +136,6 @@ pub fn wrapper_p2(input: &DMatrix<u8>) -> usize {
 mod tests {
     #[test]
     fn it_works() {
-        let small_input = "11111
-        19991
-        19191
-        19991
-        11111";
-
-        let after_one_step_input = "34543
-        40004
-        50005
-        40004
-        34543";
-
-        let small_input = super::parse_input(small_input);
-        let expect = super::parse_input(after_one_step_input);
-
-        assert_eq!(super::steps(&small_input, 1), (expect, 9));
-
         let input = "5483143223\n2745854711\n5264556173\n6141336146\n6357385478\n4167524645\n2176841721\n6882881134\n4846848554\n5283751526";
         let parsed_input = super::parse_input(input);
 
@@ -184,7 +162,7 @@ mod tests {
 
         for (expect, rounds) in results {
             let expected_mat = super::parse_input(expect);
-            // assert_eq!(super::steps(&parsed_input, rounds).0, expected_mat);
+            assert_eq!(super::steps(&parsed_input, rounds).0, expected_mat);
         }
 
         assert_eq!(204, super::flash_count(&parsed_input, 10));
