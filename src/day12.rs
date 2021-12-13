@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use nalgebra::DMatrix;
@@ -38,21 +38,25 @@ impl Cave {
         matches!(self, Cave::Small(_))
     }
 
-    fn compatible2(&self, path: &[Cave]) -> bool {
+    fn compatible2(&self, path: &[Cave], nodes: &[Cave]) -> bool {
         match self {
             Cave::Start => false,
             Cave::End | Cave::Large(_) => true,
             Cave::Small(_) => {
-                if !path.contains(self) { return true; }
-                let small_node_counts = path.iter().filter(|node| node.is_small()).fold(
-                    HashMap::<Cave, u8>::new(),
-                    |mut agg, node| {
-                        agg.entry(*node).and_modify(|i| *i += 1).or_insert(1);
-                        agg
-                    },
-                );
+                if !path.contains(self) {
+                    return true;
+                }
+                
+                let mut small_node_counts = nodes.iter().map(|_| 0u8).collect::<Vec<_>>();
 
-                !small_node_counts.iter().any(|(_, cnt)| *cnt == 2)
+                path.iter()
+                    .filter(|cave| cave.is_small())
+                    .for_each(|cave| match cave {
+                        &Cave::Small(id) => small_node_counts[id] += 1,
+                        _ => {}
+                    });
+
+                !small_node_counts.iter().any(|cnt| *cnt == 2)
             }
         }
     }
@@ -71,7 +75,7 @@ fn parse_input(input: &str) -> (Vec<Cave>, DMatrix<u8>) {
             node_names.push(pair[0].clone());
             let node_id = node_names.len() - 1;
             nodes.push(Cave::new(node_id, &node_names[node_id]));
-            
+
             // add row, col to DMatrix
             tunnels = tunnels.clone().insert_row(rows, 0);
             tunnels = tunnels.clone().insert_column(cols, 0);
@@ -83,7 +87,7 @@ fn parse_input(input: &str) -> (Vec<Cave>, DMatrix<u8>) {
             node_names.push(pair[1].clone());
             let node_id = node_names.len() - 1;
             nodes.push(Cave::new(node_id, &node_names[node_id]));
-            
+
             // add row, col to DMatrix
             tunnels = tunnels.clone().insert_row(rows, 0);
             tunnels = tunnels.clone().insert_column(cols, 0);
@@ -101,6 +105,7 @@ fn parse_input(input: &str) -> (Vec<Cave>, DMatrix<u8>) {
 
 fn solve_p1((nodes, tunnels): &(Vec<Cave>, DMatrix<u8>)) -> usize {
     let mut paths = VecDeque::new();
+    let mut finished_paths = Vec::new();
     paths.push_back(vec![Cave::Start]);
 
     while !paths.iter().all(|path| path.last() == Some(&Cave::End)) {
@@ -110,57 +115,60 @@ fn solve_p1((nodes, tunnels): &(Vec<Cave>, DMatrix<u8>)) -> usize {
             let node = path.last().unwrap();
 
             if node == &Cave::End {
-                paths.push_back(path);
-            } else {
-                let node_id = nodes.iter().position(|cave| cave == node).unwrap();
-
-                tunnels
-                    .row(node_id)
-                    .iter()
-                    .enumerate()
-                    .filter(|(id, &tunnel)| tunnel == 1 && nodes[*id].compatible(&path))
-                    .for_each(|(id, _)| {
-                        let mut new_path = path.clone();
-                        new_path.push(nodes[id]);
-                        paths.push_back(new_path);
-                    });
+                finished_paths.push(path);
+                continue
             }
+
+            let node_id = nodes.iter().position(|cave| cave == node).unwrap();
+
+            tunnels
+                .row(node_id)
+                .iter()
+                .enumerate()
+                .filter(|(id, &tunnel)| tunnel == 1 && nodes[*id].compatible(&path))
+                .for_each(|(id, _)| {
+                    let mut new_path = path.clone();
+                    new_path.push(nodes[id]);
+                    paths.push_back(new_path);
+                });
         }
     }
 
-    paths.len()
+    finished_paths.len()
 }
 
 fn solve_p2((nodes, tunnels): &(Vec<Cave>, DMatrix<u8>)) -> usize {
     let mut paths = VecDeque::new();
+    let mut finished_paths = Vec::new();
     paths.push_back(vec![Cave::Start]);
 
-    while !paths.iter().all(|path| path.last() == Some(&Cave::End)) {
+    while paths.len() > 0 {
         let pathcnt = paths.len();
         for _ in 0..pathcnt {
             let path = paths.pop_front().unwrap();
             let node = path.last().unwrap();
 
             if node == &Cave::End {
-                paths.push_back(path);
-            } else {
-                let node_id = nodes.iter().position(|cave| cave == node).unwrap();
+                finished_paths.push(path);
+                continue
+            } 
+            
+            let node_id = nodes.iter().position(|cave| cave == node).unwrap();
 
-                tunnels
-                    .row(node_id)
-                    .iter()
-                    .enumerate()
-                    .filter(|(id, &tunnel)| tunnel == 1 && nodes[*id].compatible2(&path))
-                    .for_each(|(id, _)| {
-                        let mut new_path = path.clone();
-                        new_path.push(nodes[id]);
-                        paths.push_back(new_path);
-                    });
-            }
+            tunnels
+                .row(node_id)
+                .iter()
+                .enumerate()
+                .filter(|(id, &tunnel)| tunnel == 1 && nodes[*id].compatible2(&path, &nodes))
+                .for_each(|(id, _)| {
+                    let mut new_path = path.clone();
+                    new_path.push(nodes[id]);
+                    paths.push_back(new_path);
+                });
         }
     }
 
-    paths.len()
+    finished_paths.len()
 }
 
 #[aoc_generator(day12)]
