@@ -46,7 +46,7 @@ impl Cave {
                 if !path.contains(self) {
                     return true;
                 }
-                
+
                 let mut small_node_counts = nodes.iter().map(|_| 0u8).collect::<Vec<_>>();
 
                 path.iter()
@@ -116,7 +116,7 @@ fn solve_p1((nodes, tunnels): &(Vec<Cave>, DMatrix<u8>)) -> usize {
 
             if node == &Cave::End {
                 finished_paths.push(path);
-                continue
+                continue;
             }
 
             let node_id = nodes.iter().position(|cave| cave == node).unwrap();
@@ -150,9 +150,9 @@ fn solve_p2((nodes, tunnels): &(Vec<Cave>, DMatrix<u8>)) -> usize {
 
             if node == &Cave::End {
                 finished_paths.push(path);
-                continue
-            } 
-            
+                continue;
+            }
+
             let node_id = nodes.iter().position(|cave| cave == node).unwrap();
 
             tunnels
