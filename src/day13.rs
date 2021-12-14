@@ -1,6 +1,8 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-fn parse_input(input: &str) -> (Vec<(usize, usize)>, Vec<(usize, usize)>) {
+type Paper = (Vec<(usize, usize)>, Vec<(usize, usize)>);
+
+fn parse_input(input: &str) -> Paper {
     let mut dots = Vec::new();
     let mut actions = Vec::new();
 
@@ -46,7 +48,7 @@ fn print_dots(dots: &[(usize, usize)]) {
                 print!(" ");
             }
         }
-        println!("");
+        println!();
     }
 }
 
@@ -72,17 +74,19 @@ fn fold_once(dots: &[(usize, usize)], fold: (usize, usize)) -> Vec<(usize, usize
         .collect()
 }
 
-fn solve_p1((dots, folds): &(Vec<(usize, usize)>, Vec<(usize, usize)>)) -> usize {
-    let mut dots = fold_once(&dots, folds[0]);
+fn solve_p1((dots, folds): &Paper) -> usize {
+    let mut dots = fold_once(dots, folds[0]);
 
     dots.sort_unstable();
     dots.dedup();
     dots.len()
 }
 
-fn solve_p2((dots, folds): &(Vec<(usize, usize)>, Vec<(usize, usize)>)) -> usize {
+fn solve_p2((dots, folds): &Paper) -> usize {
     let dots = folds.iter().fold(dots.clone(), |dots, fold| {
         let mut dots = fold_once(&dots, *fold);
+        dots.sort_unstable();
+        dots.dedup();
         dots
     });
 
@@ -92,17 +96,17 @@ fn solve_p2((dots, folds): &(Vec<(usize, usize)>, Vec<(usize, usize)>)) -> usize
 }
 
 #[aoc_generator(day13)]
-pub fn input_generator(input: &str) -> (Vec<(usize, usize)>, Vec<(usize, usize)>) {
+pub fn input_generator(input: &str) -> Paper {
     parse_input(input)
 }
 
 #[aoc(day13, part1)]
-pub fn wrapper_p1(input: &(Vec<(usize, usize)>, Vec<(usize, usize)>)) -> usize {
+pub fn wrapper_p1(input: &Paper) -> usize {
     solve_p1(input)
 }
 
 #[aoc(day13, part2)]
-pub fn wrapper_p2(input: &(Vec<(usize, usize)>, Vec<(usize, usize)>)) -> usize {
+pub fn wrapper_p2(input: &Paper) -> usize {
     solve_p2(input)
 }
 
