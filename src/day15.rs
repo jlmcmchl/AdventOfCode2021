@@ -1,7 +1,4 @@
-use std::{
-    cmp::Ordering,
-    collections::BinaryHeap,
-};
+use std::{cmp::Ordering, collections::BinaryHeap};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use ndarray::{Array2, Axis};
@@ -121,17 +118,33 @@ fn rebuild_path(prev: Vec<usize>, start: usize, goal: usize) -> Vec<usize> {
 fn expand(grid: &Array2<usize>) -> Array2<usize> {
     let mut space = grid.clone();
 
-    space.append(Axis(1), ((grid + 1 - 1) % 9 + 1).view()).unwrap();
-    space.append(Axis(1), ((grid + 2 - 1) % 9 + 1).view()).unwrap();
-    space.append(Axis(1), ((grid + 3 - 1) % 9 + 1).view()).unwrap();
-    space.append(Axis(1), ((grid + 4 - 1) % 9 + 1).view()).unwrap();
+    space
+        .append(Axis(1), ((grid + 1 - 1) % 9 + 1).view())
+        .unwrap();
+    space
+        .append(Axis(1), ((grid + 2 - 1) % 9 + 1).view())
+        .unwrap();
+    space
+        .append(Axis(1), ((grid + 3 - 1) % 9 + 1).view())
+        .unwrap();
+    space
+        .append(Axis(1), ((grid + 4 - 1) % 9 + 1).view())
+        .unwrap();
 
     let mut galaxy = space.clone();
 
-    galaxy.append(Axis(0), ((&space + 1 - 1) % 9 + 1).view()).unwrap();
-    galaxy.append(Axis(0), ((&space + 2 - 1) % 9 + 1).view()).unwrap();
-    galaxy.append(Axis(0), ((&space + 3 - 1) % 9 + 1).view()).unwrap();
-    galaxy.append(Axis(0), ((&space + 4 - 1) % 9 + 1).view()).unwrap();
+    galaxy
+        .append(Axis(0), ((&space + 1 - 1) % 9 + 1).view())
+        .unwrap();
+    galaxy
+        .append(Axis(0), ((&space + 2 - 1) % 9 + 1).view())
+        .unwrap();
+    galaxy
+        .append(Axis(0), ((&space + 3 - 1) % 9 + 1).view())
+        .unwrap();
+    galaxy
+        .append(Axis(0), ((&space + 4 - 1) % 9 + 1).view())
+        .unwrap();
 
     galaxy
 }
@@ -155,7 +168,6 @@ fn solve_p1(input: &Array2<usize>) -> usize {
 
     let (dist, _) = dijkstra(input, start);
 
-
     // println!(
     //     "{:?}",
     //     rebuild_path(prev, start.convert(shape), goal.convert(shape))
@@ -175,7 +187,6 @@ fn solve_p2(input: &Array2<usize>) -> usize {
     let goal = &(shape[0] - 1, shape[1] - 1);
 
     let (dist, _) = dijkstra(&input, start);
-
 
     // println!(
     //     "{:?}",

@@ -50,7 +50,7 @@ fn step(input: &SMatrix<u8, 10, 10>) -> (SMatrix<u8, 10, 10>, usize) {
                 if val > 9 && !flashers.contains(&(i, j)) {
                     // add 1 to surrounding
                     for coord in surrounding((i, j), (rows, cols)) {
-                        flash_mat[coord] = 10.max(flash_mat[coord] + 1);
+                        flash_mat[coord]  += 1;
                     }
                     flashes += 1;
                     flashers.push((i, j));
