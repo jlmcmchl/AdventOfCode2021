@@ -279,8 +279,7 @@ impl Add for Tree {
         self.content
             .iter()
             .enumerate()
-            .take(32)
-            .skip(1)
+            .filter(|(_, v)| matches!(v, Node::Value(_)))
             .for_each(|(i, v)| {
                 let ind = 2usize.pow(Tree::depth(i)) + i;
 
@@ -290,8 +289,7 @@ impl Add for Tree {
         rhs.content
             .iter()
             .enumerate()
-            .take(32)
-            .skip(1)
+            .filter(|(_, v)| matches!(v, Node::Value(_)))
             .for_each(|(i, v)| {
                 let ind = 2usize.pow(Tree::depth(i) + 1) + i;
 
