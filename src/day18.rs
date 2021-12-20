@@ -1,477 +1,405 @@
-use std::{fmt::Debug, thread, time::Duration};
+use std::{fmt::Debug, ops::Add};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use itertools::Itertools;
 use serde_json::Value;
 
-#[derive(PartialEq, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Node {
     Value(usize),
-    Pair(Pair),
+    Branch,
 }
 
-impl Debug for Node {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Value(arg0) => f.write_str(&format!("{}", arg0)),
-            Self::Pair(Pair { left, right }) => f.debug_list().entry(left).entry(right).finish(),
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tree {
+    content: [Node; 64],
+}
+
+impl Tree {
+    fn new() -> Self {
+        Tree {
+            content: [Node::Branch; 64],
         }
     }
-}
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Pair {
-    left: Box<Node>,
-    right: Box<Node>,
-}
+    fn from_json_array(json: &Value) -> Self {
+        let mut result = Tree::new();
 
-#[derive(Debug, Clone)]
-enum Direction {
-    Left,
-    Right,
-}
+        result.from_json_array_recursive(1, json);
 
-impl Node {
-    fn is_pair_of_values(&self) -> bool {
-        match self {
-            Node::Pair(Pair { left, right }) => {
-                matches!(**left, Node::Value(_)) && matches!(**right, Node::Value(_))
+        result
+    }
+
+    fn from_json_array_recursive(&mut self, current_index: usize, json: &Value) {
+        match json {
+            Value::Number(n) => {
+                self.content[current_index] = Node::Value(n.as_u64().unwrap() as usize)
+            }
+            Value::Array(vs) => {
+                self.from_json_array_recursive(Tree::get_left_child(current_index), &vs[0]);
+                self.from_json_array_recursive(Tree::get_right_child(current_index), &vs[1]);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn depth(node: usize) -> u32 {
+        node.log2()
+    }
+
+    fn get_left_child(node: usize) -> usize {
+        node << 1
+    }
+
+    fn get_right_child(node: usize) -> usize {
+        (node << 1) | 1
+    }
+
+    fn get_parent(node: usize) -> usize {
+        match node % 2 {
+            0 => node >> 1,
+            1 => (node - 1) >> 1,
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_left_of_parent(node: usize) -> bool {
+        node % 2 == 0
+    }
+
+    fn is_right_of_parent(node: usize) -> bool {
+        node % 2 == 1
+    }
+
+    fn is_value(&self, node: usize) -> bool {
+        matches!(self.content[node], Node::Value(_))
+    }
+
+    fn is_node_pair_of_values(&self, index: usize) -> bool {
+        match self.content[index] {
+            Node::Branch => {
+                let left_ind = Self::get_left_child(index);
+                let right_ind = Self::get_right_child(index);
+
+                matches!(self.content[left_ind], Node::Value(_))
+                    && matches!(self.content[right_ind], Node::Value(_))
             }
             _ => false,
         }
     }
-}
 
-fn magnitude(tree: &Node) -> usize {
-    match tree {
-        Node::Value(v) => *v,
-        Node::Pair(Pair { left, right }) => 3 * magnitude(left) + 2 * magnitude(right),
-    }
-}
+    fn get_next_left_value(&self, index: usize) -> Option<usize> {
+        let mut index = index;
 
-fn split_once(tree: &mut Node) -> bool {
-    let mut stack = vec![];
-    let mut first = true;
-
-    while !stack.is_empty() || first {
-        first = false;
-        let reftree = tree.clone();
-        let current_node = get_node(&reftree, &stack);
-        match *current_node {
-            Node::Value(_) => {
-                // maybe split?
-                if split_node(tree, &stack, current_node) {
-                    // println!("split   {:?}", tree);
-                    // thread::sleep(Duration::from_secs(1));
-                    return true;
-                }
-
-                // move up until we can move right
-                while !stack.is_empty() {
-                    let dir = stack.pop();
-                    match dir {
-                        Some(Direction::Left) => {
-                            stack.push(Direction::Right);
-                            break;
-                        }
-                        Some(Direction::Right) => {}
-                        None => unreachable!(),
-                    }
-                }
-            }
-            Node::Pair(_) => {
-                // thread::sleep(Duration::from_secs(1));
-                stack.push(Direction::Left);
-            }
-        }
-    }
-
-    false
-}
-
-fn split_node(tree: &mut Node, stack: &[Direction], current_node: &Node) -> bool {
-    if let Some((dir, stack)) = stack.split_last() {
-        let parent_node = get_node_mut(tree, stack);
-        if let Some(split_node) = split(current_node) {
-            // println!("{:?}", parent_node);
-            if let Node::Pair(pair) = parent_node {
-                // println!("{:?} {:?} {:?} {:?} {:?}", stack, current_node, split_node, pair, dir);
-                match dir {
-                    Direction::Left => {
-                        pair.left = split_node.into();
-                    }
-                    Direction::Right => {
-                        pair.right = split_node.into();
-                    }
-                }
-            }
-
-            return true;
-        }
-    }
-    false
-}
-
-fn split(node: &Node) -> Option<Node> {
-    match node {
-        Node::Value(v) if *v > 9 => {
-            let half = v / 2;
-            if v % 2 == 0 {
-                Some(Node::Pair(Pair {
-                    left: Node::Value(half).into(),
-                    right: Node::Value(half).into(),
-                }))
-            } else {
-                Some(Node::Pair(Pair {
-                    left: Node::Value(half).into(),
-                    right: Node::Value(half + 1).into(),
-                }))
-            }
-        }
-        _ => None,
-    }
-}
-
-fn get_node<'a>(tree: &'a Node, steps: &[Direction]) -> &'a Node {
-    steps.iter().fold(tree, |node, dir| match node {
-        Node::Pair(Pair { left, right }) => match dir {
-            Direction::Left => left,
-            Direction::Right => right,
-        },
-        Node::Value(_) => panic!("attempted to navigate a value w/ stack {:?}", steps),
-    })
-}
-
-fn get_node_mut<'a>(tree: &'a mut Node, steps: &[Direction]) -> &'a mut Node {
-    steps.iter().fold(tree, |node, dir| match node {
-        Node::Pair(Pair { left, right }) => match dir {
-            Direction::Left => left,
-            Direction::Right => right,
-        },
-        Node::Value(_) => panic!("attempted to navigate a value w/ stack {:?}", steps),
-    })
-}
-
-#[allow(unused)]
-fn inorder_traversal(tree: &mut Node, mut action: impl FnMut(&Node, &Vec<Direction>) -> bool) {
-    let mut stack = vec![];
-    let mut first = true;
-
-    while !stack.is_empty() || first {
-        first = false;
-        let current_node = get_node_mut(tree, &stack);
-        match *current_node {
-            Node::Value(_) => {
-                if action(current_node, &stack) {
-                    return;
-                }
-
-                // move up until we can move right
-                while !stack.is_empty() {
-                    let dir = stack.pop();
-                    match dir {
-                        Some(Direction::Left) => {
-                            stack.push(Direction::Right);
-                            break;
-                        }
-                        Some(Direction::Right) => {}
-                        None => unreachable!(),
-                    }
-                }
-            }
-            Node::Pair(_) => {
-                if action(current_node, &stack) {
-                    return;
-                }
-                stack.push(Direction::Left);
-            }
-        }
-    }
-}
-
-#[allow(unused)]
-fn explode_once(tree: &mut Node) -> bool {
-    let mut stack = vec![];
-    let mut first = true;
-
-    while !stack.is_empty() || first {
-        first = false;
-        let current_node = get_node_mut(tree, &stack);
-        match *current_node {
-            Node::Value(_) => {
-                // move up until we can move right
-                while !stack.is_empty() {
-                    let dir = stack.pop();
-                    match dir {
-                        Some(Direction::Left) => {
-                            stack.push(Direction::Right);
-                            break;
-                        }
-                        Some(Direction::Right) => {}
-                        None => unreachable!(),
-                    }
-                }
-            }
-            Node::Pair(_) => {
-                if stack.len() >= 4 && current_node.is_pair_of_values() {
-                    explode_node(tree, &stack);
-                    return true;
-                }
-
-                // thread::sleep(Duration::from_secs(1));
-                stack.push(Direction::Left);
-            }
-        }
-    }
-
-    false
-}
-
-fn explode_node(tree: &mut Node, stack: &[Direction]) {
-    let stack = stack.to_owned();
-    let current_node = get_node(tree, &stack);
-    let (left_value, right_value) = if let Node::Pair(Pair { left, right }) = &*current_node {
-        let lv = match **left {
-            Node::Value(v) => v,
-            _ => unreachable!(),
-        };
-        let rv = match **right {
-            Node::Value(v) => v,
-            _ => unreachable!(),
-        };
-
-        (lv, rv)
-    } else {
-        unreachable!()
-    };
-
-    // println!(
-    //     "exploding {:?} => {:?} {:?}",
-    //     stack, left_value, right_value
-    // );
-
-    explode_left(tree, &stack, left_value);
-    explode_right(tree, &stack, right_value);
-
-    if let Some((dir, stack)) = stack.split_last() {
-        if let Node::Pair(pair) = get_node_mut(tree, stack) {
-            match dir {
-                Direction::Left => {
-                    pair.left = Node::Value(0).into();
-                }
-                Direction::Right => {
-                    pair.right = Node::Value(0).into();
-                }
-            }
-        }
-    }
-}
-
-fn explode_left(tree: &mut Node, stack: &[Direction], left_value: usize) {
-    // explode
-    {
-        let mut left_stack = stack.to_owned();
         // traverse leftward until we are coming from the right
-        while !left_stack.is_empty() {
-            let dir = left_stack.last().unwrap();
-            match dir {
-                Direction::Left => {
-                    left_stack.pop();
-                }
-                Direction::Right => {
-                    left_stack.pop();
-                    left_stack.push(Direction::Left);
-                    break;
-                }
-            }
+        while Tree::is_left_of_parent(index) && index != 1 {
+            index = Tree::get_parent(index);
         }
 
-        // println!("left_stack found top: {:?}", left_stack);
+        index = Tree::get_parent(index);
 
-        // check top of stack
-        // if value, add left_value to node
-        // otherwise descend right
-        while !left_stack.is_empty() {
-            let current_node = get_node_mut(tree, &left_stack);
+        if index == 0 {
+            return None;
+        }
+
+        //go to left child
+        index = Tree::get_left_child(index);
+
+        // traverse until you have found the rightmost value of this subtree
+        while !self.is_value(index) {
+            index = Tree::get_right_child(index);
+        }
+
+        Some(index)
+    }
+
+    fn get_next_right_value(&self, index: usize) -> Option<usize> {
+        let mut index = index;
+
+        // traverse rightward until we are coming from the left
+        while Tree::is_right_of_parent(index) && index != 0 {
+            index = Tree::get_parent(index);
+        }
+
+        index = Tree::get_parent(index);
+
+        if index == 0 {
+            return None;
+        }
+
+        //go to right child
+        index = Tree::get_right_child(index);
+
+        // traverse until you have found the leftmost value of this subtree
+        while !self.is_value(index) {
+            index = Tree::get_left_child(index);
+        }
+
+        Some(index)
+    }
+
+    fn inorder_traversal(&mut self, mut action: impl FnMut(&mut Self, usize) -> bool) -> bool {
+        let mut index = 1;
+        loop {
+            let current_node = &self.content[index];
             match current_node {
-                Node::Value(v) => {
-                    *v += left_value;
-                    break;
-                }
-                Node::Pair(_) => {
-                    left_stack.push(Direction::Right);
+                Node::Branch => index = Tree::get_left_child(index),
+
+                Node::Value(_) => {
+                    // this is the next inorder node (value)
+                    if action(self, index) {
+                        return true;
+                    }
+
+                    // search until we are left of parent
+                    while Tree::is_right_of_parent(index) {
+                        index = Tree::get_parent(index);
+                    }
+
+                    index = Tree::get_parent(index);
+
+                    if index == 0 {
+                        return false;
+                    }
+
+                    // this is the next inorder node (branch)
+                    if action(self, index) {
+                        return true;
+                    }
+
+                    //get right (other) child
+                    index = Tree::get_right_child(index);
                 }
             }
         }
-
-        // println!("done with left");
     }
-}
 
-fn explode_right(tree: &mut Node, stack: &[Direction], right_value: usize) {
-    // explode
-    let mut right_stack = stack.to_owned();
-    // traverse rightward until we are coming from the left
-    while !right_stack.is_empty() {
-        let dir = right_stack.last().unwrap();
-        match dir {
-            Direction::Right => {
-                right_stack.pop();
-            }
-            Direction::Left => {
-                right_stack.pop();
-                right_stack.push(Direction::Right);
-                break;
-            }
+    fn split_node(&mut self, current_index: usize) {
+        if let Node::Value(v) = self.content[current_index] {
+            self.content[current_index] = Node::Branch;
+            let left_index = Tree::get_left_child(current_index);
+            let right_index = Tree::get_right_child(current_index);
+
+            let (left_value, right_value) = if v % 2 == 0 {
+                (v / 2, v / 2)
+            } else {
+                (v / 2, v / 2 + 1)
+            };
+
+            self.content[left_index] = Node::Value(left_value);
+            self.content[right_index] = Node::Value(right_value);
         }
     }
 
-    // check top of stack
-    // if value, add right_value to node
-    // otherwise descend left
-    while !right_stack.is_empty() {
-        let current_node = get_node_mut(&mut *tree, &right_stack);
-        match current_node {
-            Node::Value(v) => {
+    fn split_once(&mut self) -> bool {
+        self.inorder_traversal(|tree, index| {
+            match &tree.content[index] {
+                Node::Value(v) if *v > 9 => {
+                    tree.split_node(index);
+                    return true;
+                }
+                _ => {}
+            }
+            false
+        })
+    }
+
+    fn explode_node(&mut self, index: usize) {
+        let left_child = Tree::get_left_child(index);
+        let left_value = if let Node::Value(v) = self.content[left_child] {
+            v
+        } else {
+            0
+        };
+
+        if let Some(left_index) = self.get_next_left_value(left_child) {
+            if let Node::Value(v) = &mut self.content[left_index] {
+                *v += left_value;
+            }
+        }
+
+        let right_child = Tree::get_right_child(index);
+        let right_value = if let Node::Value(v) = self.content[right_child] {
+            v
+        } else {
+            0
+        };
+
+        if let Some(right_index) = self.get_next_right_value(right_child) {
+            if let Node::Value(v) = &mut self.content[right_index] {
                 *v += right_value;
-                break;
             }
-            Node::Pair(_) => {
-                right_stack.push(Direction::Left);
+        }
+
+        self.content[index] = Node::Value(0);
+        self.content[left_child] = Node::Branch;
+        self.content[right_child] = Node::Branch;
+    }
+
+    fn explode_once(&mut self) -> bool {
+        self.inorder_traversal(|tree, index| {
+            match &tree.content[index] {
+                Node::Branch if tree.is_node_pair_of_values(index) && Tree::depth(index) >= 4 => {
+                    tree.explode_node(index);
+                    return true;
+                }
+                _ => {}
+            }
+            false
+        })
+    }
+
+    fn magnitude(&self) -> usize {
+        self.magnitude_recursive(1)
+    }
+
+    fn magnitude_recursive(&self, index: usize) -> usize {
+        let node = self.content[index];
+
+        match node {
+            Node::Value(v) => v,
+            Node::Branch => {
+                3 * self.magnitude_recursive(Tree::get_left_child(index))
+                    + 2 * self.magnitude_recursive(Tree::get_right_child(index))
             }
         }
     }
-}
 
-fn reduce(tree: &mut Node) {
-    while reduce_once(tree) {}
-}
-
-fn reduce_once(tree: &mut Node) -> bool {
-    let mut changed = true;
-
-    while changed {
-        changed = explode_once(tree) || split_once(tree);
+    fn reduce(&mut self) {
+        while self.explode_once() || self.split_once() {}
     }
-
-    false
 }
 
-fn fold(problem: &[Node]) -> Node {
+impl Add for Tree {
+    type Output = Tree;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut joined = Tree::new();
+
+        self.content
+            .iter()
+            .enumerate()
+            .take(32)
+            .skip(1)
+            .for_each(|(i, v)| {
+                let ind = 2usize.pow(Tree::depth(i)) + i;
+
+                joined.content[ind] = *v;
+            });
+
+        rhs.content
+            .iter()
+            .enumerate()
+            .take(32)
+            .skip(1)
+            .for_each(|(i, v)| {
+                let ind = 2usize.pow(Tree::depth(i) + 1) + i;
+
+                joined.content[ind] = *v;
+            });
+
+        joined
+    }
+}
+
+impl Add for &Tree {
+    type Output = Tree;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut joined = Tree::new();
+
+        self.content
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| matches!(v, Node::Value(_)))
+            .for_each(|(i, v)| {
+                let ind = 2usize.pow(Tree::depth(i)) + i;
+
+                joined.content[ind] = *v;
+            });
+
+        rhs.content
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| matches!(v, Node::Value(_)))
+            .for_each(|(i, v)| {
+                let ind = 2usize.pow(Tree::depth(i) + 1) + i;
+
+                joined.content[ind] = *v;
+            });
+
+        joined
+    }
+}
+
+fn fold(problem: &[Tree]) -> Tree {
     problem
         .iter()
         .cloned()
         .reduce(|agg, new| {
-            // println!("state {:?}", agg);
-            let mut full = add(&agg, &new);
-            // println!("add     {:?}", full);
-            // thread::sleep(Duration::from_secs(1));
-            reduce(&mut full);
-            // panic!("early exit");
+            let mut full = agg + new;
+            full.reduce();
             full
         })
         .unwrap()
 }
 
-fn add(first: &Node, second: &Node) -> Node {
-    Node::Pair(Pair {
-        left: first.clone().into(),
-        right: second.clone().into(),
-    })
-}
-
-fn parse_node_recurse(input: &Value) -> Node {
-    match input {
-        Value::Number(n) => Node::Value(n.as_u64().unwrap() as usize),
-        Value::Array(vs) => Node::Pair(Pair {
-            left: parse_node_recurse(&vs[0]).into(),
-            right: parse_node_recurse(&vs[1]).into(),
-        }),
-        _ => unreachable!(),
-    }
-}
-
-fn parse_node(input: &str) -> Node {
+fn parse_node(input: &str) -> Tree {
     let v: Value = match serde_json::from_str(input) {
         Ok(v) => v,
         Err(e) => panic!("{}", e),
     };
-    parse_node_recurse(&v)
+    Tree::from_json_array(&v)
 }
 
-fn parse_input(input: &str) -> Vec<Node> {
+fn parse_input(input: &str) -> Vec<Tree> {
     input.lines().map(parse_node).collect()
 }
 
-fn solve_p1(target: &[Node]) -> usize {
-    let reduced = fold(target);
-    magnitude(&reduced)
+fn solve_p1(target: &[Tree]) -> usize {
+    let tree = fold(target);
+    tree.magnitude()
 }
 
-fn solve_p2(target: &[Node]) -> usize {
-    target.iter().cartesian_product(target).map(|(first, second)| {
-        let mut full = add(&first, &second);
-        reduce(&mut full);
-        magnitude(&full)
-    }).max().unwrap()
+fn solve_p2(target: &[Tree]) -> usize {
+    target
+        .iter()
+        .cartesian_product(target)
+        .map(|(first, second)| {
+            let mut tree = first + second;
+            tree.reduce();
+            tree.magnitude()
+        })
+        .max()
+        .unwrap()
 }
 
 #[aoc_generator(day18)]
-pub fn input_generator(input: &str) -> Vec<Node> {
+pub fn input_generator(input: &str) -> Vec<Tree> {
     parse_input(input)
 }
 
 #[aoc(day18, part1)]
-pub fn wrapper_p1(input: &[Node]) -> usize {
+pub fn wrapper_p1(input: &[Tree]) -> usize {
     solve_p1(input)
 }
 
 #[aoc(day18, part2)]
-pub fn wrapper_p2(input: &[Node]) -> usize {
+pub fn wrapper_p2(input: &[Tree]) -> usize {
     solve_p2(input)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::day18::{Node, Pair};
-
-    #[test]
-    fn test_split() {
-        assert_eq!(
-            super::split(&Node::Value(10)),
-            Some(Node::Pair(Pair {
-                left: Node::Value(5).into(),
-                right: Node::Value(5).into()
-            }))
-        );
-        assert_eq!(
-            super::split(&Node::Value(11)),
-            Some(Node::Pair(Pair {
-                left: Node::Value(5).into(),
-                right: Node::Value(6).into()
-            }))
-        );
-        assert_eq!(
-            super::split(&Node::Value(12)),
-            Some(Node::Pair(Pair {
-                left: Node::Value(6).into(),
-                right: Node::Value(6).into()
-            }))
-        );
-    }
 
     #[test]
     fn test_add() {
         let first = super::parse_node("[1,2]");
         let second = super::parse_node("[[3,4],5]");
 
-        assert_eq!(
-            super::add(&first, &second),
-            Node::Pair(Pair {
-                left: first.into(),
-                right: second.into()
-            })
-        );
+        let expect = super::parse_node("[[1,2],[[3,4],5]]");
+
+        assert_eq!(first + second, expect);
     }
 
     #[test]
@@ -494,7 +422,7 @@ mod tests {
             let mut parsed_input = super::parse_node(input);
             let parsed_expect = super::parse_node(expect);
 
-            super::explode_once(&mut parsed_input);
+            parsed_input.explode_once();
             assert_eq!(parsed_input, parsed_expect);
         }
     }
@@ -507,10 +435,10 @@ mod tests {
         );
         let expect = super::parse_node("[[[[0,7],4],[[7,8],[6,0]]],[8,1]]");
 
-        let mut concat = super::add(&first, &second);
+        let mut concat = first + second;
 
         // println!("start   {:?}", concat);
-        super::reduce(&mut concat);
+        concat.reduce();
 
         assert_eq!(concat, expect);
     }
@@ -544,7 +472,6 @@ mod tests {
             let parsed_input = super::parse_input(input);
             let parsed_expect = super::parse_node(expect);
 
-
             // println!("start   {:?}", parsed_input);
 
             let result = super::fold(&parsed_input);
@@ -575,7 +502,7 @@ mod tests {
 
         for (input, expect) in magnitude_tests {
             let parsed_input = super::parse_node(input);
-            assert_eq!(super::magnitude(&parsed_input), expect);
+            assert_eq!(parsed_input.magnitude(), expect);
         }
     }
 

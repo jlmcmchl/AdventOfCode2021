@@ -1,4 +1,5 @@
 #![feature(int_abs_diff)]
+#![feature(int_log)]
 
 use aoc_runner_derive::aoc_lib;
 
