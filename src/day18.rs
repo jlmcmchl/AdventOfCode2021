@@ -56,11 +56,7 @@ impl Tree {
     }
 
     fn get_parent(node: usize) -> usize {
-        match node % 2 {
-            0 => node >> 1,
-            1 => (node - 1) >> 1,
-            _ => unreachable!(),
-        }
+        node >> 1
     }
 
     fn is_left_of_parent(node: usize) -> bool {
