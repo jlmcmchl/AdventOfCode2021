@@ -60,11 +60,11 @@ impl Tree {
     }
 
     fn is_left_of_parent(node: usize) -> bool {
-        node % 2 == 0
+        node & 1 == 0
     }
 
     fn is_right_of_parent(node: usize) -> bool {
-        node % 2 == 1
+        node & 1 == 1
     }
 
     fn is_value(&self, node: usize) -> bool {
