@@ -8,10 +8,6 @@ fn position(score: usize) -> usize {
     (score - 1) % 10 + 1
 }
 
-fn roll(rolls: usize) -> usize {
-    (rolls - 1) % 100 + 1
-}
-
 fn triangle(rolls: usize) -> usize {
     rolls * (rolls + 1) / 2
 }
@@ -148,7 +144,10 @@ lazy_static! {
     };
 }
 
-fn iter_p2(state: &mut HashMap<(Player, Player), usize>, winning_score: usize) -> (HashMap<(Player, Player), usize>, usize, usize) {
+fn iter_p2(
+    state: &mut HashMap<(Player, Player), usize>,
+    winning_score: usize,
+) -> (HashMap<(Player, Player), usize>, usize, usize) {
     let mut p1_wins = 0;
     let mut p2_wins = 0;
 
@@ -158,7 +157,7 @@ fn iter_p2(state: &mut HashMap<(Player, Player), usize>, winning_score: usize) -
         // spawn all new universes
         for p1_roll in DIRAC_ROLLS.iter() {
             // iter player 1
-            let mut p1 = p1.clone();
+            let mut p1 = *p1;
             p1.position = position(p1.position + p1_roll);
             p1.score += p1.position;
 
@@ -170,7 +169,7 @@ fn iter_p2(state: &mut HashMap<(Player, Player), usize>, winning_score: usize) -
 
             for p2_roll in DIRAC_ROLLS.iter() {
                 // iter player 2
-                let mut p2 = p2.clone();
+                let mut p2 = *p2;
                 p2.position = position(p2.position + p2_roll);
                 p2.score += p2.position;
 
