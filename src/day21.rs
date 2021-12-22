@@ -21,12 +21,22 @@ struct Player {
 
 impl Player {
     fn new(start: usize, id: u8) -> Self {
-        Player { position: start, id, score: 0 }
+        Player {
+            position: start,
+            id,
+            score: 0,
+        }
     }
 
     #[allow(unused)]
     fn print_state(&self, rolls: usize) {
-        println!("Player {} rolls {:?} and moves to space {} for a total score of {}", self.id, (rolls-2)..=(rolls), self.position, self.score);
+        println!(
+            "Player {} rolls {:?} and moves to space {} for a total score of {}",
+            self.id,
+            (rolls - 2)..=(rolls),
+            self.position,
+            self.score
+        );
     }
 }
 
@@ -46,7 +56,7 @@ fn score_players(first: &mut Player, second: &mut Player) -> usize {
 
         // first.print_state(rolls);
         if first.score >= 1000 {
-            break
+            break;
         }
 
         let current_step = second.position + high_rolls_score - mid_rolls_score;
@@ -57,7 +67,7 @@ fn score_players(first: &mut Player, second: &mut Player) -> usize {
 
         // second.print_state(rolls);
         if second.score >= 1000 {
-            break
+            break;
         }
 
         // std::thread::sleep(std::time::Duration::from_secs(1));
@@ -67,7 +77,10 @@ fn score_players(first: &mut Player, second: &mut Player) -> usize {
 }
 
 fn parse_input(input: &str) -> Vec<usize> {
-    input.lines().map(|line| line.bytes().last().unwrap() as usize - 48).collect()
+    input
+        .lines()
+        .map(|line| line.bytes().last().unwrap() as usize - 48)
+        .collect()
 }
 
 fn solve_p1(target: &[usize]) -> usize {
