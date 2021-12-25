@@ -30,7 +30,7 @@ pub enum Instruction {
 }
 
 #[derive(Debug)]
-struct ALU {
+struct Alu {
     counter: usize,
     instructions: Vec<Instruction>,
     registers: HashMap<Register, i64>,
@@ -42,7 +42,7 @@ enum State {
     Halt,
 }
 
-impl ALU {
+impl Alu {
     fn set_argument(&mut self, arg: Argument, input: i64) {
         assert!(matches!(arg, Argument::Register(_)));
 
@@ -54,7 +54,7 @@ impl ALU {
     fn get_argument(&self, arg: Argument) -> i64 {
         match arg {
             Argument::Value(v) => v,
-            Argument::Register(reg) => self.registers.get(&reg).map(|i| *i).unwrap_or_default(),
+            Argument::Register(reg) => self.registers.get(&reg).copied().unwrap_or_default(),
         }
     }
     fn simulate(&mut self, input: i64) -> (State, i64) {
@@ -217,7 +217,7 @@ fn parse_input(input: &str) -> Vec<Instruction> {
 fn find_highest_pair(input: &[Instruction], first_input: usize, second_input: usize) -> (i64, i64) {
     for i in (1..=9).rev() {
         for j in (1..=9).rev() {
-            let mut alu = ALU {
+            let mut alu = Alu {
                 counter: first_input * 18,
                 instructions: input.to_owned(),
                 registers: HashMap::new(),
@@ -238,7 +238,7 @@ fn find_highest_pair(input: &[Instruction], first_input: usize, second_input: us
 fn find_lowest_pair(input: &[Instruction], first_input: usize, second_input: usize) -> (i64, i64) {
     for i in 1..=9 {
         for j in 1..=9 {
-            let mut alu = ALU {
+            let mut alu = Alu {
                 counter: first_input * 18,
                 instructions: input.to_owned(),
                 registers: HashMap::new(),
