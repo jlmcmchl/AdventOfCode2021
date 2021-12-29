@@ -353,10 +353,8 @@ impl Graph {
             })
             // if we are targeting a hole, filter to only try and place into the deepest spot
             .filter(|id| match id {
-                7.. => {
-                    deepest.contains(&id)
-                },
-                _ => true
+                7.. => deepest.contains(id),
+                _ => true,
             })
             .map(|target| {
                 let weight = SKIP_GRAPH[(node, target)];
@@ -462,55 +460,75 @@ fn astar_successors(state: &Graph, p2: bool) -> Vec<(Graph, usize)> {
 
     let deepest_a = {
         let a_tunnel = [19, 15, 11, 7];
-        if a_tunnel.iter()
+        if a_tunnel
+            .iter()
             .filter(|id| p2 || **id < 15)
-            .any(|id| !matches!(state.node_content[*id], Some(Amphipod::A) | None)) {
+            .any(|id| !matches!(state.node_content[*id], Some(Amphipod::A) | None))
+        {
             0
         } else {
-            *a_tunnel.iter()            .filter(|id| p2 || **id < 15)
-            .find(|id| matches!(state.node_content[**id], None)).unwrap_or(&0)
+            *a_tunnel
+                .iter()
+                .filter(|id| p2 || **id < 15)
+                .find(|id| matches!(state.node_content[**id], None))
+                .unwrap_or(&0)
         }
     };
 
     let deepest_b = {
         let b_tunnel = [20, 16, 12, 8];
-        
-        if b_tunnel.iter()
+
+        if b_tunnel
+            .iter()
             .filter(|id| p2 || **id < 15)
-            .any(|id| !matches!(state.node_content[*id], Some(Amphipod::B) | None)) {
+            .any(|id| !matches!(state.node_content[*id], Some(Amphipod::B) | None))
+        {
             0
         } else {
-            *b_tunnel.iter()
-            .filter(|id| p2 || **id < 15)
-            .find(|id| matches!(state.node_content[**id], None)).unwrap_or(&0)
+            *b_tunnel
+                .iter()
+                .filter(|id| p2 || **id < 15)
+                .find(|id| matches!(state.node_content[**id], None))
+                .unwrap_or(&0)
         }
     };
 
     let deepest_c = {
         let c_tunnel = [21, 17, 13, 9];
-        if c_tunnel.iter()            .filter(|id| p2 || **id < 15)
-        .any(|id| !matches!(state.node_content[*id], Some(Amphipod::C) | None)) {
+        if c_tunnel
+            .iter()
+            .filter(|id| p2 || **id < 15)
+            .any(|id| !matches!(state.node_content[*id], Some(Amphipod::C) | None))
+        {
             0
         } else {
-            *c_tunnel.iter()            .filter(|id| p2 || **id < 15)
-            .find(|id| matches!(state.node_content[**id], None)).unwrap_or(&0)
+            *c_tunnel
+                .iter()
+                .filter(|id| p2 || **id < 15)
+                .find(|id| matches!(state.node_content[**id], None))
+                .unwrap_or(&0)
         }
     };
 
     let deepest_d = {
         let d_tunnel = [22, 18, 14, 10];
-        if d_tunnel.iter()            .filter(|id| p2 || **id < 15)
-        .any(|id| !matches!(state.node_content[*id], Some(Amphipod::D) | None)) {
+        if d_tunnel
+            .iter()
+            .filter(|id| p2 || **id < 15)
+            .any(|id| !matches!(state.node_content[*id], Some(Amphipod::D) | None))
+        {
             0
         } else {
-            *d_tunnel.iter()            .filter(|id| p2 || **id < 15)
-            .find(|id| matches!(state.node_content[**id], None)).unwrap_or(&0)
+            *d_tunnel
+                .iter()
+                .filter(|id| p2 || **id < 15)
+                .find(|id| matches!(state.node_content[**id], None))
+                .unwrap_or(&0)
         }
     };
 
     let deepest = [deepest_a, deepest_b, deepest_c, deepest_d];
 
-    // let succ = 
     state
         .node_content
         .iter()
@@ -518,9 +536,6 @@ fn astar_successors(state: &Graph, p2: bool) -> Vec<(Graph, usize)> {
         .filter(|(_, v)| v.is_some())
         .flat_map(|(id, _)| state.moves_from(id, deepest, p2))
         .collect::<Vec<_>>()
-    // ;
-    // println!("future states: {}", succ.len());
-    // succ
 }
 
 fn heuristic(state: &Graph) -> usize {
