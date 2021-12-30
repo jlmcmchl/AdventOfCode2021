@@ -1,125 +1,113 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use aoc_runner_derive::{aoc, aoc_generator};
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use nalgebra::{matrix, Matrix3, Vector3};
 use ndarray::Array2;
+use pathfinding::prelude::kruskal_indices;
 
-#[derive(Debug)]
+#[derive(Default, Clone, PartialEq)]
 pub struct Scanner {
     id: usize,
     position: Option<Vector3<isize>>,
     rotation: Option<Matrix3<isize>>,
     beacons: Vec<Beacon>,
-    beacon_graph: Array2<f64>,
+    beacon_graph: Array2<isize>,
 }
 
-#[derive(Debug)]
+impl Debug for Scanner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Scanner")
+            .field("id", &self.id)
+            .field("position", &self.position)
+            .field("rotation", &self.rotation)
+            .field("beacons", &self.beacons)
+            .finish()
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Beacon {
     offset: Vector3<isize>,
 }
 
 lazy_static! {
     static ref ORIENTATIONS: Vec<Matrix3<isize>> = vec![
-        //      +x  +y  +z
         matrix![ 1,  0,  0;
                  0,  1,  0;
                  0,  0,  1],
-        //      +x  +z  -y
-        matrix![ 1,  0,  0;
-                 0,  0,  1;
-                 0, -1,  0],
-        //      +x  -y  -z
-        matrix![ 1,  0,  0;
-                 0, -1,  0;
-                 0,  0, -1],
-        //      +x  -z  +y
-        matrix![ 1,  0,  0;
-                 0,  0, -1;
-                 0,  1,  0],
-
-        //      -x  +y  -z
+        matrix![-1,  0,  0;
+                 0,  -1,  0;
+                 0,  0,  1],
         matrix![-1,  0,  0;
                  0,  1,  0;
                  0,  0, -1],
-        //      -x  -z  -y
-        matrix![-1,  0,  0;
-                 0,  0, -1;
-                 0, -1,  0],
-        //      -x  -y  +z
-        matrix![-1,  0,  0;
+        matrix![ 1,  0,  0;
                  0, -1,  0;
-                 0,  0,  1],
-        //      -x  +z  +y
+                 0,  0, -1],
+
         matrix![-1,  0,  0;
                  0,  0,  1;
                  0,  1,  0],
-
-        //      +y  -x  +z
-        matrix![ 0,  1,  0;
-                -1,  0,  0;
-                 0,  0,  1],
-        //      +y  +z  +x
-        matrix![ 0,  1,  0;
+        matrix![ 1,  0,  0;
+                 0,  0,  -1;
+                 0,  1,  0],
+        matrix![ 1,  0,  0;
                  0,  0,  1;
-                 1,  0,  0],
-        //      +y  +x  -z
-        matrix![ 0,  1,  0;
-                 1,  0,  0;
-                 0,  0, -1],
-        //      +y  -z  -x
-        matrix![ 0,  1,  0;
+                 0, -1,  0],
+        matrix![-1,  0,  0;
                  0,  0, -1;
-                 1,  0,  0],
-
-        //      -y  +x  +z
+                 0, -1,  0],
+        
         matrix![ 0, -1,  0;
                  1,  0,  0;
                  0,  0,  1],
-        //      -y  +z  -x
+        matrix![ 0,  1,  0;
+                -1,  0,  0;
+                 0,  0,  1],
+        matrix![ 0,  1,  0;
+                 1,  0,  0;
+                 0,  0, -1],
+        matrix![ 0, -1,  0;
+                -1,  0,  0;
+                 0,  0, -1],
+
+        matrix![ 0,  1,  0;
+                 0,  0,  1;
+                 1,  0,  0],
+        matrix![ 0, -1,  0;
+                 0,  0, -1;
+                 1,  0,  0],
         matrix![ 0, -1,  0;
                  0,  0,  1;
                 -1,  0,  0],
-        //      -y  -x  -z
-        matrix![ 0, -1,  0;
-                -1,  0,  0;
-                 0,  0, -1],
-        //      -y  -z  +x
-        matrix![ 0, -1,  0;
+        matrix![ 0,  1,  0;
                  0,  0, -1;
-                 1,  0,  0],
-
-        //      +z  +y  -x
-        matrix![ 0,  0,  1;
-                 0,  1,  0;
                 -1,  0,  0],
-        //      +z  -x  -y
+
+        matrix![ 0,  0,  1;
+                 1,  0,  0;
+                 0,  1,  0],
+        matrix![ 0,  0, -1;
+                -1,  0,  0;
+                 0,  1,  0],
+        matrix![ 0,  0, -1;
+                 1,  0,  0;
+                 0, -1,  0],
         matrix![ 0,  0,  1;
                 -1,  0,  0;
                  0, -1,  0],
-        //      +z  -y  +x
+        
+        matrix![ 0,  0, -1;
+                 0,  1,  0;
+                 1,  0,  0],
         matrix![ 0,  0,  1;
                  0, -1,  0;
                  1,  0,  0],
-        //      +z  +x  +y
         matrix![ 0,  0,  1;
-                 1,  0,  0;
-                 0,  1,  0],
-
-        //      -z  -x  +y
-        matrix![ 0,  0, -1;
-                -1,  0,  0;
-                 0,  1,  0],
-        //      -z  +y  +x
-        matrix![ 0,  0, -1;
                  0,  1,  0;
-                 1,  0,  0],
-        //      -z  +x  -y
-        matrix![ 0,  0, -1;
-                 1,  0,  0;
-                 0, -1,  0],
-        //      -z  -y  -x
+                -1,  0,  0],
         matrix![ 0,  0, -1;
                  0, -1,  0;
                 -1,  0,  0],
@@ -127,32 +115,90 @@ lazy_static! {
     ];
 }
 
-fn prim(beacons: &Array2<f64>) -> Array2<f64> {
-    let shape = beacons.shape();
-    let mut vertices = vec![0];
-    let mut mst = Array2::zeros((shape[0], shape[1]));
+fn counter_intersection(
+    first: &HashMap<Vec<isize>, usize>,
+    second: &HashMap<Vec<isize>, usize>,
+) -> usize {
+    first
+        .iter()
+        .filter_map(|(key, count)| second.get(key).map(|other_count| other_count.min(count)))
+        .sum()
+}
 
-    while vertices.len() < shape[0] {
-        vertices.iter().map(|vertex| {
-            beacons
-                .row(*vertex)
-                .columns()
-                .into_iter()
-                .enumerate()
-                .filter(|(id, dist)| vertex != id)
-                .map(|(id, dist)| (vertex, id, dist.first()))
-                .min_by_key(|(_, _, dist)| dist)
+fn beacon_graph(scanner: &Scanner) -> Array2<Vec<isize>> {
+    let beacon_count = scanner.beacons.len();
+
+    Array2::from_shape_fn((beacon_count, beacon_count), |(i, j)| {
+        let first = &scanner.beacons[i];
+        let second = &scanner.beacons[j];
+        taxicab_distance(first, second)
+    })
+}
+
+fn reposition(scanner: &Scanner, stable: &Scanner, threshold: usize) -> Option<Scanner> {
+    // println!(
+    //     "beginning reposition search {} based off {} on rotation {}",
+    //     scanner.id, stable.id, scanner.rotation.unwrap()
+    // );
+
+    let first_beacon_graph = beacon_graph(scanner);
+
+    let second_beacon_graph = beacon_graph(stable);
+
+    for (beacon_id, row) in first_beacon_graph.rows().into_iter().enumerate() {
+        let counter = row.into_iter().fold(HashMap::new(), |mut map, val| {
+            map.entry(val.clone()).and_modify(|v| *v += 1).or_insert(1);
+            map
         });
+
+        for (other_beacon_id, other_row) in second_beacon_graph.rows().into_iter().enumerate() {
+            let other_counter = other_row.into_iter().fold(HashMap::new(), |mut map, val| {
+                map.entry(val.clone()).and_modify(|v| *v += 1).or_insert(1);
+                map
+            });
+
+            let intersection = counter_intersection(&counter, &other_counter);
+            // println!(
+            //     "orientation? {}/{} -> {}",
+            //     scanner.id, stable.id, intersection
+            // );
+        
+
+            if intersection >= threshold {
+                // we have found a match
+                // scanner.position + beacon.offset = stable.position + other_beacon.offset
+                // scanner.position = stable.position + other_beacon.offset - beacon.offset
+                let mut scanner = scanner.clone();
+                scanner.position = stable.position.map(|position| {
+                    position + stable.beacons[other_beacon_id].offset
+                        - scanner.beacons[beacon_id].offset
+                });
+                // println!("  found orientation! {:?}", scanner.position);
+                // let beacons = scanner
+                //     .beacons
+                //     .iter()
+                //     .map(|beacon| {
+                //         scanner
+                //             .position
+                //             .map(|position| position + beacon.offset)
+                //             .map(|vec| (vec[0], vec[1], vec[2]))
+                //             .unwrap_or_default()
+                //     })
+                //     .collect::<Vec<_>>();
+                // println!("  {:?}", beacons);
+                return Some(scanner);
+            }
+        }
     }
 
-    mst
+    None
 }
 
 fn reorient(scanner: &Scanner, orientation: &Matrix3<isize>) -> Scanner {
     Scanner {
         id: scanner.id,
         position: scanner.position,
-        rotation: Some(orientation.clone()),
+        rotation: Some(*orientation),
         beacons: scanner
             .beacons
             .iter()
@@ -171,31 +217,19 @@ fn reorient(scanner: &Scanner, orientation: &Matrix3<isize>) -> Scanner {
 fn find_right_orientation(
     scanner: &Scanner,
     target: &Scanner,
-    test: impl Fn(&Scanner, &Scanner) -> bool,
+    threshold: usize,
 ) -> Option<Scanner> {
     ORIENTATIONS
         .iter()
         .map(|orient| reorient(scanner, orient))
-        .filter(|scanner| test(scanner, target))
+        .filter_map(|scanner| reposition(&scanner, target, threshold))
         .next()
 }
 
-fn are_linked(
-    scanner: &Scanner,
-    target: &Scanner,
-    test: impl Fn(&Scanner, &Scanner) -> bool,
-) -> Option<Scanner> {
-    ORIENTATIONS
-        .iter()
-        .map(|orient| reorient(scanner, orient))
-        .filter(|scanner| test(scanner, target))
-        .next()
-}
-
-fn generate_beacon_graph(beacons: &[Beacon]) -> Array2<f64> {
+fn generate_beacon_graph(beacons: &[Beacon]) -> Array2<isize> {
     let beacon_count = beacons.len();
 
-    let mut beacon_graph = Array2::from_elem((beacon_count, beacon_count), 0.);
+    let mut beacon_graph = Array2::from_elem((beacon_count, beacon_count), 0);
 
     beacons
         .iter()
@@ -203,7 +237,6 @@ fn generate_beacon_graph(beacons: &[Beacon]) -> Array2<f64> {
         .combinations(2)
         .map(|pair| (pair[0].0, pair[1].0, distance(pair[0].1, pair[1].1)))
         .for_each(|(i, j, dist)| {
-            let dist = (dist as f64).sqrt();
             beacon_graph[(i, j)] = dist;
             beacon_graph[(j, i)] = dist;
         });
@@ -214,10 +247,11 @@ fn generate_beacon_graph(beacons: &[Beacon]) -> Array2<f64> {
 fn parse_input(input: &str) -> Vec<Scanner> {
     input
         .split("\n\n")
-        .map(|scanner| {
+        .enumerate()
+        .map(|(base_id, scanner)| {
             let mut scanner_lines = scanner.lines();
             let header = scanner_lines.next().unwrap();
-            let id = header.split(' ').nth(2).unwrap().parse().unwrap();
+            let id: usize = header.split(' ').nth(2).unwrap().parse().unwrap();
             let beacons = scanner_lines
                 .map(|line| {
                     let position = line
@@ -232,8 +266,8 @@ fn parse_input(input: &str) -> Vec<Scanner> {
             let beacon_graph = generate_beacon_graph(&beacons);
 
             Scanner {
-                id,
-                position: None,
+                id: base_id,
+                position: Some(Vector3::new(0, 0, 0)),
                 rotation: None,
                 beacons,
                 beacon_graph,
@@ -249,6 +283,15 @@ fn distance(first: &Beacon, second: &Beacon) -> isize {
         .zip(&second.offset)
         .map(|(a, b)| (b - a).pow(2))
         .sum()
+}
+
+fn taxicab_distance(first: &Beacon, second: &Beacon) -> Vec<isize> {
+    first
+        .offset
+        .iter()
+        .zip(&second.offset)
+        .map(|(a, b)| b - a)
+        .collect()
 }
 
 fn get_distances(scanner: &Scanner) -> HashMap<isize, usize> {
@@ -296,18 +339,102 @@ fn build_graph(scanner_graph: &mut Array2<usize>, scanner_maps: &[HashMap<isize,
         });
 }
 
-fn count_beacons(graph: &Array2<usize>, scanners: &[Scanner], overlap_threshold: usize) -> usize {
-    let mut all_beacon_records: usize = scanners.iter().map(|scanner| scanner.beacons.len()).sum();
+fn count_beacons(scanners: &[Scanner]) -> usize {
+    let mut all_beacons = scanners
+        .iter()
+        .flat_map(|scanner| {
+            scanner.beacons.iter().map(|beacon| {
+                scanner
+                    .position
+                    .map(|position| position + beacon.offset)
+                    .map(|vec| (vec[0], vec[1], vec[2]))
+                    .unwrap_or_default()
+            })
+        })
+        .collect::<Vec<_>>();
 
-    for i in 0..scanners.len() {
-        for j in (i + 1)..scanners.len() {
-            if graph[(i, j)] >= (overlap_threshold * (overlap_threshold - 1)) / 2 {
-                all_beacon_records -= overlap_threshold;
+    all_beacons.sort_unstable();
+    all_beacons.dedup();
+    all_beacons.len()
+}
+
+fn graph_to_edges(graph: &Array2<usize>, threshold: usize) -> Vec<(usize, usize, usize)> {
+    graph
+        .rows()
+        .into_iter()
+        .enumerate()
+        .flat_map(|(i, row)| {
+            row.iter()
+                .enumerate()
+                .filter(|(_, val)| **val >= (threshold * (threshold - 1)) / 2)
+                .map(move |(j, val)| (i, j, *val))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+fn reorient_scanners(
+    scanners: &[Scanner],
+    graph: &[(usize, usize, usize)],
+    threshold: usize,
+) -> Vec<Scanner> {
+    let mut scanners_oriented = scanners.iter().map(|_| None).collect::<Vec<_>>();
+    scanners_oriented[0] = Some(scanners[0].clone());
+
+    while scanners_oriented.iter().any(|scanner| scanner.is_none()) {
+        graph.iter().for_each(|(first, second, _)| {
+            println!(
+                "attempting to setup scanners {} and {} based on each other",
+                first, second
+            );
+
+            let first_scanner = &scanners_oriented[*first];
+            let second_scanner = &scanners_oriented[*second];
+            match (first_scanner, second_scanner) {
+                (Some(_), Some(_)) => {
+                    println!("both are oriented, continuing");
+                }
+                /* find orientation for second */
+                (Some(first_scanner), None) => {
+                    println!("first has an entry");
+                    match find_right_orientation(&scanners[*second], first_scanner, threshold) {
+                        Some(scanner) => scanners_oriented[*second] = Some(scanner),
+                        None => panic!("could not find orientation for scanner {}", second),
+                    }
+                }
+                /* find orientation for first */
+                (None, Some(second_scanner)) => {
+                    println!("second has an entry");
+                    match find_right_orientation(&scanners[*first], second_scanner, threshold) {
+                        Some(scanner) => scanners_oriented[*first] = Some(scanner),
+                        None => panic!("could not find orientation for scanner {}", first),
+                    }
+                }
+                /* can't do anything until we get first or second oriented */
+                (None, None) => {
+                    println!("neither are currently oriented, skipping");
+                } // panic!("attempting to match two unmatched scanners {} and {}", first, second),
             }
-        }
+            // let beacons = first_scanner.beacons.iter().map(|beacon| {
+            //     first_scanner
+            //         .position
+            //         .map(|position| position + beacon.offset)
+            //         .map(|vec| (vec[0], vec[1], vec[2]))
+            //         .unwrap_or_default()
+            // }).collect::<Vec<_>>();
+            // println!("looking from {} {:?}", first_scanner.id, beacons);
+            // match find_right_orientation(&scanners[*second], &scanners_oriented[*first], threshold) {
+            //     Some(scanner) => scanners_oriented[*second] = Some(scanner),
+            //     None => panic!("could not find orientation for scanner {}", second),
+            // }
+        });
     }
 
-    all_beacon_records
+    scanners_oriented
+        .iter()
+        .map(|scanner| scanner.as_ref().unwrap())
+        .cloned()
+        .collect()
 }
 
 fn solve_p1(scanners: &[Scanner], overlap_threshold: usize) -> usize {
@@ -315,24 +442,61 @@ fn solve_p1(scanners: &[Scanner], overlap_threshold: usize) -> usize {
 
     let scanner_maps = scanners
         .iter()
-        .map(|scanner| get_distances(scanner))
+        .map(get_distances)
         .collect::<Vec<_>>();
 
     build_graph(&mut scanner_graph, &scanner_maps);
 
-    for i in 0..scanners.len() {
-        for j in 0..scanners.len() {
-            print!("{}\t", scanner_graph[(i, j)]);
-        }
-        println!()
-    }
-    // println!("{}", scanner_graph);
+    let edges = graph_to_edges(&scanner_graph, overlap_threshold);
 
-    count_beacons(&scanner_graph, scanners, overlap_threshold)
+    println!("{:?}", edges);
+
+    let mut tree = kruskal_indices(scanners.len(), &edges)
+        .map(|(first, second, weight)| (first.min(second), first.max(second), weight))
+        .collect::<Vec<_>>();
+
+    // tree.sort_unstable();
+
+    println!("{:?}", tree);
+
+    let scanners = reorient_scanners(scanners, &tree, overlap_threshold);
+
+    // println!("scanners: {:?}", scanners);
+
+    count_beacons(&scanners)
 }
 
-fn solve_p2(target: &[Scanner]) -> usize {
-    Default::default()
+fn solve_p2(scanners: &[Scanner], overlap_threshold: usize) -> usize {
+    let mut scanner_graph = init_graph(scanners);
+
+    let scanner_maps = scanners
+        .iter()
+        .map(get_distances)
+        .collect::<Vec<_>>();
+
+    build_graph(&mut scanner_graph, &scanner_maps);
+
+    let edges = graph_to_edges(&scanner_graph, overlap_threshold);
+
+    println!("{:?}", edges);
+
+    let mut tree = kruskal_indices(scanners.len(), &edges)
+        .map(|(first, second, weight)| (first.min(second), first.max(second), weight))
+        .collect::<Vec<_>>();
+
+    // tree.sort_unstable();
+
+    println!("{:?}", tree);
+
+    let scanners = reorient_scanners(scanners, &tree, overlap_threshold);
+
+    // println!("scanners: {:?}", scanners);
+
+    scanners.iter().tuple_combinations().map(|(first, second)| {
+        let p1 = first.position.unwrap();
+        let p2 = second.position.unwrap();
+        p1.iter().zip(&p2).map(|(a, b)|a.abs_diff(*b)).sum()
+    }).max().unwrap()
 }
 
 #[aoc_generator(day19)]
@@ -347,7 +511,7 @@ pub fn wrapper_p1(input: &[Scanner]) -> usize {
 
 #[aoc(day19, part2)]
 pub fn wrapper_p2(input: &[Scanner]) -> usize {
-    solve_p2(input)
+    solve_p2(input, 12)
 }
 
 #[cfg(test)]
@@ -361,7 +525,7 @@ mod tests {
         // println!("{:?}", parsed_input);
 
         assert_eq!(3, super::solve_p1(&parsed_input, 3));
-        assert_eq!(0, super::solve_p2(&parsed_input));
+        // assert_eq!(0, super::solve_p2(&parsed_input, 3));
     }
 
     #[test]
@@ -370,7 +534,7 @@ mod tests {
         let parsed_input = super::input_generator(input);
 
         assert_eq!(6, super::solve_p1(&parsed_input, 6));
-        assert_eq!(0, super::solve_p2(&parsed_input));
+        // assert_eq!(0, super::solve_p2(&parsed_input, 6));
     }
 
     #[test]
@@ -379,6 +543,6 @@ mod tests {
         let parsed_input = super::input_generator(input);
 
         assert_eq!(79, super::solve_p1(&parsed_input, 12));
-        assert_eq!(0, super::solve_p2(&parsed_input));
+        assert_eq!(3621, super::solve_p2(&parsed_input, 12));
     }
 }
